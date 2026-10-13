@@ -19,3 +19,12 @@ DETECTION
 dati interessanti per identificare le comunicazioni: 
 - se abbiamo due dispositivi A e B abbiamo due MAC address ma questo modo non è reliable perchè se questi fanno un altra connessione il MAC verrà randomizzato. 
 - una cosa interessante è l'access address che è l'identificativo della connessione tra A e B e possiamo intanto guessare quanti scambi fanno e per quanto
+
+operazioni fatte : 
+
+1. salvare il numero di CONNECT_REQ/CONNECT_IND , verificare quante di queste sono state stabilite, salvare l'access address, salvare tempo, initA, AdvA
+2. Associa tutti i pacchetti che hanno lo stesso Access Address, ...
+3. registra l'ultimo pacchetto o quando chiama LL_TERMINATE_IND
+4. Conta gli indirizzi sovrapposti dal CONNECT_IND e gli indirizzi distinti tra loro (A->B)(A->C) che significano 2 collegamenti e 3 indirizzi
+
+limiti : gli indirizzi sono una stima dei dispositivi fisici perchè possono cambiare.
