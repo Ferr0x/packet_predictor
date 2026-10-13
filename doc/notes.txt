@@ -1,0 +1,21 @@
+BLE connection : 
+BLE connection operate i 2.4 GHz band using two main model:
+- connectionless (broadcasting/advertising) : a device periodically sends out small advertising packet 
+    central / observer : a device scans for these advertisements 
+- connection oriented : when a central device spot a connection request 
+
+how a BLE packet is build 
+at link layer every paket share the same base structure 
+
+
+1 preable 
+4 access address
+2 protocol data unit 
+3 cyclic redundanct 
+
+
+
+DETECTION 
+dati interessanti per identificare le comunicazioni: 
+- se abbiamo due dispositivi A e B abbiamo due MAC address ma questo modo non è reliable perchè se questi fanno un altra connessione il MAC verrà randomizzato. 
+- una cosa interessante è l'access address che è l'identificativo della connessione tra A e B e possiamo intanto guessare quanti scambi fanno e per quanto
