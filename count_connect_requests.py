@@ -11,7 +11,7 @@ ADVERTISING_PDUS = {"0x00", "0x02", "0x06", "0x07"} # ADV_IND , ADV_NONCONN_IND,
 
 RSSI_WINDOW = 2          # seconds at the start and end of each MAC's history
 MIN_PACKETS = 10        # minimum samples in each window
-MAX_MAC_GAP = 2       # maximum gap between old and new MACs, in seconds
+MAX_MAC_GAP = 0.5       # maximum gap between old and new MACs, in seconds
 RSSI_TOLERANCE = 5 # maximum RSSI difference, in dB
 EVENT_GAP = 0.005       # advertisements within 5 ms may belong to one event
 TREND_WINDOW = 1        # seconds in each RSSI evolution window
