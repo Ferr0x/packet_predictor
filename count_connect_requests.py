@@ -14,7 +14,6 @@ MIN_PACKETS = 10        # minimum samples in each window
 MAX_MAC_GAP = 0.5       # maximum gap between old and new MACs, in seconds
 RSSI_TOLERANCE = 5 # maximum RSSI difference, in dB
 EVENT_GAP = 0.005       # advertisements within 5 ms may belong to one event
-TREND_WINDOW = 1        # seconds in each RSSI evolution window
 TOP_K = 3               # maximum number of candidates to display
 MIN_MARGIN = 0.1        # minimum score difference from the second candidate
 MAX_TIMING_DISTANCE = 0.5
@@ -34,25 +33,7 @@ def window_profile(packets):
             events.append(time)
     gaps = [second - first for first, second in zip(events, events[1:])]
     timing = signal_stats(gaps) if len(gaps) >= 2 else None
-    rate = len(gaps) / (events[-1] - events[0]) if gaps else None
-    return {"rssi": signal_stats([rssi for time, rssi in packets]),
-            "timing": timing, "events": len(events), "rate": rate}
-
-
-def rssi_evolution(packets):
-    buckets = defaultdict(list)
-    first = packets[0][0]
-    for time, rssi in packets:
-        buckets[int((time - first) / TREND_WINDOW)].append((time, rssi))
-    series = []
-    for index, samples in sorted(buckets.items()):
-        if len(samples) >= 3:
-            point = signal_stats([rssi for time, rssi in samples])
-            point["index"] = index
-            point["time"] = median(time for time, rssi in samples)
-            point["count"] = len(samples)
-            series.append(point)
-    return series
+    return {"rssi": signal_stats([rssi for time, rssi in packets]), "timing": timing}
 
 
 def profile_distance(old, new):
@@ -102,19 +83,16 @@ def rank_mac_candidates(tracks, capture_end):
             if timing_distance is not None:
                 parts.append(timing_distance)
             rankings[new_mac].append({
-                "mac": old_mac, "joint_score": fmean(parts), "gap": gap,
+                "mac": old_mac, "score": fmean(parts), "gap": gap,
                 "rssi_difference": difference, "rssi_distance": rssi_distance,
                 "timing_distance": timing_distance,
-                "baseline_score": difference / RSSI_TOLERANCE + gap / MAX_MAC_GAP,
             })
     for matches in rankings.values():
-        for item in matches:
-            item["score"] = item["joint_score"]
         matches.sort(key=lambda item: (item["score"], item["mac"]))
     return dict(rankings)
 
 
-def mac_change_decisions(rankings, use_rssi=True, use_timing=True):
+def mac_change_decisions(rankings):
     # Top-k keeps alternatives; accepting a pair requires mutual preference
     # and sufficient margins. K does not set the number of devices.
     by_old_mac = defaultdict(list)
@@ -124,14 +102,13 @@ def mac_change_decisions(rankings, use_rssi=True, use_timing=True):
     for matches in by_old_mac.values():
         matches.sort()
     changes = {}
-    decisions = {}
     for new_mac, matches in rankings.items():
         best = matches[0]
         reasons = []
         rssi_gap = best["rssi_difference"]
-        if use_rssi and rssi_gap > RSSI_TOLERANCE:
+        if rssi_gap > RSSI_TOLERANCE:
             reasons.append("rssi")
-        if use_timing and best["timing_distance"] is not None and best["timing_distance"] > MAX_TIMING_DISTANCE:
+        if best["timing_distance"] is not None and best["timing_distance"] > MAX_TIMING_DISTANCE:
             reasons.append("timing")
         forward_margin = matches[1]["score"] - best["score"] if len(matches) > 1 else None
         if forward_margin is not None and forward_margin < MIN_MARGIN:
@@ -142,12 +119,9 @@ def mac_change_decisions(rankings, use_rssi=True, use_timing=True):
         reverse_margin = reverse[1][0] - reverse[0][0] if len(reverse) > 1 else None
         if reverse_margin is not None and reverse_margin < MIN_MARGIN:
             reasons.append("reverse_margin")
-        decisions[new_mac] = {"reasons": reasons, "best_mac": best["mac"], "rssi_gap": rssi_gap,
-                              "forward_margin": forward_margin, "reverse_margin": reverse_margin,
-                              "reverse_best_new": reverse[0][1]}
         if not reasons:
             changes[new_mac] = best["mac"]
-    return changes, decisions
+    return changes
 
 
 def analyze_rssi(rows): #
@@ -162,22 +136,20 @@ def analyze_rssi(rows): #
         end_packets = [(time, rssi) for time, rssi in packets if time >= last - RSSI_WINDOW]  
         start_profile = window_profile(start_packets)
         end_profile = window_profile(end_packets)
-        series = rssi_evolution(packets)
         tracks[mac] = {
             "first": first, "last": last, "packets": len(packets),
             "start_count": len(start_packets), "end_count": len(end_packets),
             "start_rssi": start_profile["rssi"]["median"],
             "end_rssi": end_profile["rssi"]["median"],
             "start_profile": start_profile, "end_profile": end_profile,
-            "series": series,
         }
     capture_end = max((track["last"] for track in tracks.values()), default=0)
     rankings = rank_mac_candidates(tracks, capture_end)
-    changes, decisions = mac_change_decisions(rankings)
+    changes = mac_change_decisions(rankings)
     return tracks, changes, rankings
 
 
-def save_rssi_plots(file, tracks, changes, rankings, profile_count):
+def save_rssi_plots(file, changes, rankings, profile_count):
     """Save two plots for this PCAP; do not change the analysis results."""
     from datetime import datetime
 
@@ -290,7 +262,7 @@ def report_rssi(rows, file):
           f"addresses excluded due to insufficient samples: {len(tracks) - profile_count}")
     print(f"  Profile groups assuming these associations: {profile_count - len(changes)}")
     print("  The exact number of physical devices remains unknown.")
-    save_rssi_plots(file, tracks, changes, rankings, profile_count)
+    save_rssi_plots(file, changes, rankings, profile_count)
 
 
 def regular_interval(events): #30 ms good intervall check the blog that explain it 
